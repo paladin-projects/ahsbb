@@ -27,7 +27,7 @@ types:
           cases:
             0x0002: type18
             0x000a: type6
-            0x002a: type10
+            0x002a: type22
             0x003a: type10
             0x005a: type16
             0x006a: type9
@@ -321,7 +321,12 @@ types:
     seq:
       - id: unknown1
         size: 5
+  type22:
+    seq:
+      - id: unknown1
+        size: 17
   failback:
     seq:
       - id: unknown1
-        size: 2
+        size: 1
+        process: stop(_io)
