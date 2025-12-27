@@ -68,8 +68,10 @@ types:
             0x0988: type1
             0x098c: type1
             0x0c84: type1
+            0x0c86: type23
             0x0c88: type1
             0x0c8c: type1
+            0x0c8e: type23
             0x0d18: type15
             0x0d84: type1
             0x0d88: type1
@@ -136,6 +138,8 @@ types:
             0x2284: type1
             0x2288: type1
             0x228c: type1
+            0x2484: type1
+            0x2488: type1
             0x2584: type1
             0x2588: type1
             0x258c: type1
@@ -143,6 +147,7 @@ types:
             0x2688: type1
             0x268c: type1
             0x2a00: type20
+            0x2a29: type11
             0x2a84: type1
             0x2a88: type1
             0x2a8c: type1
@@ -159,8 +164,12 @@ types:
             0x318e: type3
             0x3192: type3
             0x31a2: type3
+            0x3286: type23 # 44 bytes
+            0x3288: type1 # 96 bytes 
             0x3384: type1
             0x3388: type1
+            0x3784: type1
+            0x3788: type1
             0x3802: type11
             0x3886: type3
             0x3888: type1
@@ -176,10 +185,41 @@ types:
             0x3e88: type1
             0x3f84: type1
             0x3f88: type1
+            0x4084: type1
+            0x4088: type1 # 96 bytes
+            0x408c: type1
+            0x4286: type23
+            0x4288: type1
+            0x428e: type23
+            0x4384: type1
+            0x4386: type23
+            0x4388: type1
+            0x438c: type1
+            0x438e: type23
             0x4484: type1
+            0x4486: type23
             0x4488: type1
             0x448c: type1
+            0x448e: type23
             0x4492: type3
+            0x4584: type1
+            0x4586: type23 # 44 bytes
+            0x4588: type1
+            0x458e: type23
+            0x4784: type1
+            0x4788: type1
+            0x4884: type1
+            0x4888: type1
+            0x488c: type1
+            0x4b84: type1
+            0x4b88: type1
+            0x4c86: type23
+            0x4c88: type1
+            0x4c8e: type23
+            0x5584: type1
+            0x5588: type1
+            0x5684: type1
+            0x5688: type1
             0x6286: type3
             0x628e: type3
             0x6292: type3
@@ -325,6 +365,15 @@ types:
     seq:
       - id: unknown1
         size: 17
+  type23:
+    seq:
+      - id: unknown1
+        type: u2
+      - id: unknown2
+        type: u4
+      - id: body
+        type: strz
+        size: 36
   failback:
     seq:
       - id: unknown1
