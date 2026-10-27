@@ -37,14 +37,19 @@ doc: |
   id) and a Code (struct id), optionally refined by field levels l1f/l2f/l3f
   and an instance number. Bit meanings of the flag byte confirmed in the
   decoder: 0x80 descriptor, 0x40 instance, 0x20 tick, 0x04 l1f present,
-  0x02 xflags u2 present. In the firmware decoder xflags bits 0x100/0x200 mean
-  an l2f/l3f byte; the data files here have no such byte, so data records
-  do not parse it.
+  0x02 xflags u2 present. In data files xflags 0x0001 means an l2f byte
+  follows l1f, and 0x0002 an l3f byte after that (seen on class 0x44, 0x62, 0x13 records of iLO 5 3.09);
+  0x0100 and 0x0200 (the firmware's l2f/l3f bits) carry no extra byte
+  here; 0x0200 marks a zlib-compressed payload (class 0x13, BIOS Redfish JSON).
   Bits 0x08 and 0x10 are not tested by the decoder; the writer sets 0x08
   in blackbox_log() and 0x48 in blackbox_log_instance().
 
   Two wrappers start with 0x46: kind 0x46 + service 01 (n46) and 0x46 +
   service 03 (w46); they carry their length at a different offset.
+
+  Text fields (names, texts) are exposed as bytes (cut at the first NUL where
+  the field has one); decode them yourself, e.g. bytes.decode('utf-8', 'replace'):
+  firmware text is not guaranteed to be valid UTF-8.
 
   Payload types are known for the records listed in the "payload_type" switch,
   everything else is exposed as raw bytes.
@@ -106,8 +111,8 @@ types:
       - id: reserved
         size: 2
       - id: name
-        type: strz
         size: 88
+        terminator: 0
 
   def44:
     doc: |
@@ -142,8 +147,8 @@ types:
       - id: reserved2
         size: 2
       - id: name
-        type: strz
         size: 32
+        terminator: 0
 
   data_record:
     seq:
@@ -160,6 +165,14 @@ types:
         type: u1
         if: (kind & 0x04) != 0
         doc: level-1 field index (blackbox_log_field style records)
+      - id: l2f
+        type: u1
+        if: (kind & 0x02) != 0 and (xflags & 0x01) != 0
+        doc: level-2 field index; present when xflags bit 0 is set
+      - id: l3f
+        type: u1
+        if: (kind & 0x02) != 0 and (xflags & 0x02) != 0
+        doc: level-3 field index; present when xflags bit 1 is set
       - id: instance
         type: u1
         if: (kind & 0x40) != 0
@@ -276,26 +289,23 @@ types:
   text_payload:
     seq:
       - id: text
-        type: strz
         size-eos: true
+        terminator: 0
 
   rest_text:
     seq:
       - id: text
-        type: strz
         size-eos: true
-
+        terminator: 0
   rde_text:
     seq:
       - id: text
-        type: strz
         size-eos: true
-
+        terminator: 0
   redfish_json:
     doc: Redfish resource snapshot as JSON text
     seq:
       - id: text
-        type: str
         size-eos: true
 
   heartbeat:
@@ -337,7 +347,6 @@ types:
     doc: UEFI/BIOS variable snapshot (CQH/CQS prefix) name + raw value
     seq:
       - id: name
-        type: str
         terminator: 0
         eos-error: false
       - id: value
@@ -349,15 +358,12 @@ types:
       - id: header
         size: 18
       - id: date_text
-        type: str
         terminator: 0
         eos-error: false
       - id: code_text
-        type: str
         terminator: 0
         eos-error: false
       - id: message
-        type: str
         terminator: 0
         eos-error: false
       - id: tail
@@ -368,7 +374,6 @@ types:
       - id: event_id
         type: u4
       - id: name
-        type: str
         size: 32
         terminator: 0
       - id: args
