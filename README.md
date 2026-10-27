@@ -1,21 +1,18 @@
-# Parsing Black Box Files from Acitve Health Check Logs (AHS)
-This repo contains an attempt to parse AHS BB files. BB file is a binary log containing records with variable length, prefixed by a marker. Kaitai Struct file tries to capture all possible markers to split BB file into records. The contents and meaning of records is highly unknown at the moment. Generated parser is able to parse some of the BB files, but not all of them due to missing markers and understanding of all possible records structure.
+# Active Health System Logs
+HP/HPE ProLiant and Apollo servers starting from Generation 8 (Gen8) have introduced Active Health System which writes all events and logs of running server and its Board Management Controller "iLO" into a "black box". This AHS Log can be requested and downloaded from iLO, but its structure is binary and not documented. There were no publicly available tools to see the contents of the file. First published attempt to decode AHS Logs was from Mark Honeychurch (see [this blog](https://mark.honeychurch.org/blog/projects/ahs/)), he published JavaScript code on Github ([markhoney/ahs](https://github.com/markhoney/ahs)). Unfortunately, the work was not finished, and original code was only able to extract files from AHS container, but not decipher the contents of black box files.
 
-# Usage
-* Process AHS Log with AHS Extract utility :
+With recent attempt to decode AHS Logs with Claude, we were able to decode the contents of black box files and retrive their contents. Claude was able to find that sys_boot_support.bb and ilo_boot_support.bb files are actually dictionaries to all other numbered bb files.
 
-`node [path to ahs-extract]/ahs-extract -e [AHS Log].ahs`
+In this repo you will find Kaitai Struct definitions for the AHS Log file (having .ahs suffix) and Black Box files (having .zbb or .bb suffix).
 
-* Compile Python parser with Kiatai Struct Compiler:
+## Usage
+You can generate parser for .ahs and .bb files for your preferred language. For example, compile Python parser with Kaitai Struct Compiler:
 
-`ksc -t python --no-auto-read ahsbb.ksy`
+`ksc -t python ahs.ksy`
+`ksc -t python ahsbb.ksy`
 
-* Process selected BB file with ahsbb-reader.py:
+This will generate `ahs.py` and `ahsbb.py` modules that you can import and work through ahs and bb file contents. Use [Kaitai Web IDE](https://ide.kaitai.io/), if you want to see the contents interactively.
 
-`./ahsbb-reader.py [your BB file].bb`
-
-# Dependencies
-* Node.js (for AHS Extract utility)
-* AHS Extract utility <https://github.com/tzong/ahs-extract>
-* Kaitai Struct Compiler <https://kaitai.io/>
-* Kaitai Struct Python run-time library (python3-kaitaistruct package in Ubuntu)
+## Dependencies
+* Kaitai Struct Compiler <https://kaitai.io/>.
+* Kaitai Struct Python run-time library (python3-kaitaistruct package in Ubuntu) for further development.
