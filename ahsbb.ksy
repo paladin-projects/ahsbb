@@ -52,7 +52,11 @@ doc: |
   firmware text is not guaranteed to be valid UTF-8.
 
   Payload types are known for the records listed in the "payload_type" switch,
-  everything else is exposed as raw bytes.
+  everything else is exposed as raw bytes. Besides the fixed-size structs of the
+  dictionaries there are payloads that the dictionaries do not describe field by
+  field: SMBIOS structures (class 5, code = structure type), the IPMI FRU of a
+  power supply (class 6 code 3), the iLO event logs of class 0x0d (IML, iLO Event
+  Log, Security Log, their critical copies and the raw IML events) and Redfish JSON.
 
 seq:
   - id: records
@@ -192,7 +196,15 @@ types:
             0x0c06: platdef_c06
             0x0c07: platdef_c07
             0x0d04: bios_variable
-            0x0d0c: bios_event
+            0x0d0b: ilo_event
+            0x0d0c: ilo_event
+            0x0d0d: ilo_event
+            0x0d1a: ilo_event
+            0x0d1b: ilo_event
+            0x0d1c: ilo_event
+            0x0d1e: raw_iml_event
+            0x0500: smbios_structure
+            0x0603: ipmi_fru
             0x1101: evt_record
             0x3901: rest_text
             0x4c01: rde_text
@@ -229,13 +241,13 @@ types:
         value: (class_id << 8) | code
       size_matches:
         value: >-
-          payload_key == 0x0103 ? len_payload ==8 : payload_key == 0x0202 ? len_payload ==8 : payload_key == 0x0203 ? len_payload ==64 : payload_key == 0x020f ? len_payload ==88 : payload_key == 0x0303 ? len_payload ==18 : payload_key == 0x0c04 ? len_payload ==54 : payload_key == 0x0c06 ? len_payload >=2 : payload_key == 0x0c07 ? len_payload ==8 : payload_key == 0x0c08 ? len_payload ==6 : payload_key == 0x0c3c ? len_payload ==6 : payload_key == 0x0d0c ? len_payload >=18 : payload_key == 0x1001 ? len_payload ==32 : payload_key == 0x1101 ? len_payload ==52 : payload_key == 0x13f0 ? len_payload ==8 : payload_key == 0x1504 ? len_payload ==332 : payload_key == 0x1701 ? len_payload ==28 : payload_key == 0x1901 ? len_payload ==192 : payload_key == 0x1a01 ? len_payload ==2 : payload_key == 0x1d01 ? len_payload ==1 : payload_key == 0x1f01 ? len_payload ==16 : payload_key == 0x1f04 ? len_payload ==388 : payload_key == 0x1f05 ? len_payload ==256 : payload_key == 0x4301 ? len_payload ==372 : payload_key == 0x4302 ? len_payload ==40 : payload_key == 0x4303 ? len_payload ==76 : payload_key == 0x4304 ? len_payload ==8 : payload_key == 0x4505 ? len_payload ==44 : payload_key == 0x4506 ? len_payload ==48 : payload_key == 0x4801 ? len_payload ==20 : true
+          payload_key == 0x0103 ? len_payload ==8 : payload_key == 0x0202 ? len_payload ==8 : payload_key == 0x0203 ? len_payload ==64 : payload_key == 0x020f ? len_payload ==88 : payload_key == 0x0303 ? len_payload ==18 : payload_key == 0x0c04 ? len_payload ==54 : payload_key == 0x0c06 ? len_payload >=2 : payload_key == 0x0c07 ? len_payload ==8 : payload_key == 0x0c08 ? len_payload ==6 : payload_key == 0x0c3c ? len_payload ==6 : payload_key == 0x0d0b ? len_payload >=21 : payload_key == 0x0d0c ? len_payload >=21 : payload_key == 0x0d0d ? len_payload >=21 : payload_key == 0x0d1a ? len_payload >=21 : payload_key == 0x0d1b ? len_payload >=21 : payload_key == 0x0d1c ? len_payload >=21 : payload_key == 0x0d1e ? len_payload >=24 : payload_key == 0x1001 ? len_payload ==32 : payload_key == 0x1101 ? len_payload ==52 : payload_key == 0x13f0 ? len_payload ==8 : payload_key == 0x1504 ? len_payload ==332 : payload_key == 0x1701 ? len_payload ==28 : payload_key == 0x1901 ? len_payload ==192 : payload_key == 0x1a01 ? len_payload ==2 : payload_key == 0x1d01 ? len_payload ==1 : payload_key == 0x1f01 ? len_payload ==16 : payload_key == 0x1f04 ? len_payload ==388 : payload_key == 0x1f05 ? len_payload ==256 : payload_key == 0x4301 ? len_payload ==372 : payload_key == 0x4302 ? len_payload ==40 : payload_key == 0x4303 ? len_payload ==76 : payload_key == 0x4304 ? len_payload ==8 : payload_key == 0x4505 ? len_payload ==44 : payload_key == 0x4506 ? len_payload ==48 : payload_key == 0x4801 ? len_payload ==20 : true
         doc: |
           Typed payload structs have a fixed size that comes from the
           dictionary of one firmware generation (iLO 5). Newer firmware
           (iLO 7) can change a size, then the payload stays raw.
       payload_type:
-        value: 'size_matches ? payload_key : 0'
+        value: 'class_id == 5 ? 0x0500 : size_matches ? payload_key : 0'
 
   n46_record:
     seq:
@@ -352,22 +364,196 @@ types:
       - id: value
         size-eos: true
 
-  bios_event:
-    doc: Text event with date string and message
+  ilo_event:
+    doc: |
+      Event of the iLO logs kept in SRAM (class 0x0d): code 0x0b Integrated Management
+      Log (IML), 0x0c iLO Event Log, 0x0d Security Log, 0x1a / 0x1b / 0x1c copies of the
+      critical events of the three logs. The fields match the columns of the IML export
+      of the iLO web UI (ID, Severity, Class, Description, Last Update, Category). An
+      event that repeats keeps its event_id and gets a new date; the same event_id with
+      another message or severity is another event. Class names confirmed by the message
+      texts: 17 Network, 32 System Revision, 33 Maintenance (10, 20, 34, 35, 55 are not
+      named). Checked on 13285 records of three servers (iLO 5 2.x and 3.x).
     seq:
-      - id: header
-        size: 18
+      - id: version
+        type: u1
+        doc: always 3
+      - id: severity
+        type: u1
+        enum: event_severity
+      - id: event_class
+        type: u2
+      - id: event_code
+        type: u2
+        doc: number of the event inside the class
+      - id: event_id
+        type: u4
+        doc: grows with every new event of the log
+      - id: category_mask
+        type: u4
+        doc: |
+          bit 0x01 Configuration, 0x02 Hardware, 0x08 Maintenance, 0x10 Administration,
+          0x20 Power (names of the IML export); other bits are not named
+      - id: reserved
+        type: u4
+        doc: always 0
       - id: date_text
-        terminator: 0
-        eos-error: false
-      - id: code_text
-        terminator: 0
-        eos-error: false
+        type: strz
+        encoding: ASCII
+        doc: 'MM/DD/YYYY HH:MM:SS on the iLO clock (UTC); 01/01/1970 while the clock is not set'
+      - id: len_message
+        type: u2
       - id: message
-        terminator: 0
-        eos-error: false
+        size: len_message
+        type: str
+        encoding: ISO-8859-1
+        doc: text with optional ACTION text and line breaks; NUL terminated inside the length or right after it
       - id: tail
         size-eos: true
+
+  raw_iml_event:
+    doc: |
+      Raw IML event (class 0x0d code 0x1e): an event of the IML with the time of its first
+      and last occurrence and how many times it occurred (the Count of the IML export),
+      written when the event is raised or repeated.
+    seq:
+      - id: len_event
+        type: u2
+        doc: length of the whole event; the stored record can be shorter (24 bytes)
+      - id: event_id
+        type: u4
+        doc: same id as in the IML
+      - id: version
+        type: u1
+      - id: severity
+        type: u1
+        enum: event_severity
+      - id: event_class
+        type: u2
+      - id: event_code
+        type: u2
+      - id: first_time
+        type: u4
+        doc: Unix time, UTC
+      - id: last_time
+        type: u4
+        doc: Unix time, UTC
+      - id: repeat_count
+        type: u4
+      - id: event_data
+        size-eos: true
+        doc: values and strings of the event (device name, part number, ...)
+
+  smbios_structure:
+    doc: |
+      One SMBIOS structure written by the host at POST (class 5, the code is the
+      structure type). A boot writes a run of them starting with type 0. Types that the
+      HPE report uses, offsets in the formatted part (the header is 4 bytes):
+      0 BIOS information: strings vendor@4, version@5 (the ROM family, "U46"), date@8,
+        release major@20, minor@21; HPE OEM 216 (0xd8): strings name@6, version@7
+        (System ROM, Redundant System ROM, PMC, SPS, IPAD, TPM, ...);
+      1 System: manufacturer@4, product@5, version@6, serial@7, SKU@25 (string numbers);
+      2 Board: manufacturer@4, product@5, version@6, serial@7, asset@8, location@10;
+      3 Chassis: manufacturer@4, version@6, serial@7, asset@8;
+      4 Processor: socket@4, manufacturer@7, version@0x10, serial@0x20, part@0x22,
+        max speed u2@0x16, core count@0x23;
+      9 System slot: designation@4, current usage@7 (3 available, 4 in use);
+      17 Memory device: size u2@0x0c (0x7fff: extended size u4@0x1c, bit 15: KB),
+        speed u2@0x15, locator@0x10, bank@0x11, manufacturer@0x17, serial@0x18,
+        asset@0x19, part@0x1a.
+      A string number selects the strings that follow the formatted part (1-based, 0 none).
+    seq:
+      - id: structure_type
+        type: u1
+      - id: len_formatted
+        type: u1
+        doc: length of the header and the formatted part
+      - id: handle
+        type: u2
+      - id: formatted
+        size: len_formatted - 4
+      - id: strings
+        type: strz
+        encoding: ISO-8859-1
+        repeat: until
+        repeat-until: _ == ""
+        doc: the last, empty string is the second NUL that ends the structure
+      - id: tail
+        size-eos: true
+
+  ipmi_fru:
+    doc: |
+      IPMI FRU data of a power supply (class 6 code 3, the instance is the bay).
+      Common header, then the board and product info areas at offset * 8.
+    seq:
+      - id: version
+        type: u1
+      - id: internal_use_offset
+        type: u1
+      - id: chassis_offset
+        type: u1
+      - id: board_offset
+        type: u1
+      - id: product_offset
+        type: u1
+      - id: multirecord_offset
+        type: u1
+      - id: pad
+        type: u1
+      - id: checksum
+        type: u1
+    instances:
+      board:
+        pos: board_offset * 8
+        type: fru_board_area
+        if: board_offset != 0 and board_offset * 8 < _io.size
+      product:
+        pos: product_offset * 8
+        type: fru_product_area
+        if: product_offset != 0 and product_offset * 8 < _io.size
+
+  fru_board_area:
+    seq:
+      - id: version
+        type: u1
+      - id: len_area
+        type: u1
+        doc: in units of 8 bytes
+      - id: language
+        type: u1
+      - id: manufacturing_time
+        size: 3
+        doc: minutes since 1996-01-01
+      - id: fields
+        type: fru_field
+        repeat: until
+        repeat-until: _.type_len == 0xc1
+        doc: manufacturer, product name, serial number, part number, FRU file id
+
+  fru_product_area:
+    seq:
+      - id: version
+        type: u1
+      - id: len_area
+        type: u1
+      - id: language
+        type: u1
+      - id: fields
+        type: fru_field
+        repeat: until
+        repeat-until: _.type_len == 0xc1
+        doc: manufacturer, product name, part number, version, serial number, asset tag, FRU file id
+
+  fru_field:
+    seq:
+      - id: type_len
+        type: u1
+        doc: 0xc1 ends the list; otherwise the low 6 bits are the length
+      - id: data
+        size: type_len & 0x3f
+        type: str
+        encoding: ISO-8859-1
+        if: type_len != 0xc1
 
   evt_record:
     seq:
@@ -2013,6 +2199,11 @@ types:
         doc: "auto"
 
 enums:
+  event_severity:
+    2: informational
+    6: repaired
+    9: caution
+    15: critical
   bb_class:
       1: ahs_data
       2: platform_hardware
@@ -2020,6 +2211,7 @@ enums:
       5: smbios
       6: ilo_power_manager
       12: ilo_health_subsystem
+      13: sram_subsystem
       14: ilo_power_manager_14
       16: ilo_virtual_devices
       19: romchf_data
@@ -2044,5 +2236,6 @@ enums:
       72: vpd_fw_controlled
       75: ilo_backup_restore
       76: rde_data
+      77: rde_resourcemonitor
       85: svcs_ilo
       86: evs
